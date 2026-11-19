@@ -1,6 +1,6 @@
 # Codebase map
 
-> Status: the DB layer, the frontend and `GET /api/courses` are implemented. The other API routes are still 501 stubs, and the Dockerfile is empty.
+> Status: the DB layer, the frontend and all API routes are implemented. The Dockerfile is still empty.
 > Update this page as files get implemented.
 
 ## Overview

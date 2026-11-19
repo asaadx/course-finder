@@ -159,3 +159,95 @@ def test_get_unknown_or_invalid_course_is_404_json(client, path):
     resp = client.get(path)
     assert resp.status_code == 404
     assert "error" in resp.get_json()
+
+
+# ---------- /api/enrollments ----------
+
+def enroll(client, body=None, **kwargs):
+    return client.post("/api/enrollments", json=body, **kwargs)
+
+
+def test_no_enrollments_initially(client):
+    resp = client.get("/api/enrollments")
+    assert resp.status_code == 200
+    assert resp.get_json() == []
+
+
+def test_enroll_returns_201_with_enrollment(client):
+    resp = enroll(client, {"course_id": 4})
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["course"] == {
+        "id": 4,
+        "code": "COE 628",
+        "title": "Operating Systems",
+        "description": "Processes, threads, scheduling, synchronization, memory and file systems.",
+        "credits": 1.0,
+    }
+    assert isinstance(body["id"], int) and body["enrolled_at"]
+
+
+def test_one_enrollment_is_listed(client):
+    created = enroll(client, {"course_id": 4}).get_json()
+    assert client.get("/api/enrollments").get_json() == [created]
+
+
+def test_enrollment_is_listed_and_flagged_in_search(client):
+    enroll(client, {"course_id": 4})
+    enroll(client, {"course_id": 1})
+    listed = client.get("/api/enrollments").get_json()
+    assert [e["course"]["code"] for e in listed] == ["COE 628", "COE 528"]  # oldest first
+    flags = {c["code"]: c["enrolled"] for c in search(client)}
+    assert flags["COE 628"] and flags["COE 528"] and sum(flags.values()) == 2
+
+
+def test_enrolling_twice_is_409(client):
+    assert enroll(client, {"course_id": 4}).status_code == 201
+    resp = enroll(client, {"course_id": 4})
+    assert resp.status_code == 409
+    assert "already enrolled" in resp.get_json()["error"]
+    assert len(client.get("/api/enrollments").get_json()) == 1
+
+
+@pytest.mark.parametrize("course_id", [9999, 2**63 - 1])
+def test_enrolling_in_unknown_course_is_404(client, course_id):
+    resp = enroll(client, {"course_id": course_id})
+    assert resp.status_code == 404
+    assert resp.get_json() == {"error": "Course not found."}
+
+
+@pytest.mark.parametrize("course_id", [
+    "4", 4.0, 1.5, True, False, None, 0, -1, 2**63, [4], {"id": 4},
+])
+def test_invalid_course_id_is_400(client, course_id):
+    resp = enroll(client, {"course_id": course_id})
+    assert resp.status_code == 400
+    assert "positive integer" in resp.get_json()["error"]
+
+
+def test_missing_course_id_is_400(client):
+    assert enroll(client, {}).status_code == 400
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"json": [4]},                                                # JSON, but not an object
+    {"json": "4"},
+    {"data": "{not json", "content_type": "application/json"},   # malformed JSON
+    {"data": "course_id=4", "content_type": "application/x-www-form-urlencoded"},
+    {},                                                           # no body at all
+])
+def test_non_object_body_is_400(client, kwargs):
+    resp = client.post("/api/enrollments", **kwargs)
+    assert resp.status_code == 400
+    assert resp.get_json() == {"error": "Request body must be a JSON object."}
+
+
+def test_oversized_body_is_413_json(client):
+    resp = client.post("/api/enrollments", data='{"course_id": 4, "x": "' + "a" * 2000 + '"}',
+                       content_type="application/json")
+    assert resp.status_code == 413
+    assert "error" in resp.get_json()
+
+
+def test_extra_fields_are_ignored(client):
+    assert enroll(client, {"course_id": 4, "extra": "ignored"}).status_code == 201
