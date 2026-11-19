@@ -77,7 +77,7 @@ All responses are JSON. Errors always look like `{"error": "message"}`.
 
 | Method | Path | Description | Responses |
 |---|---|---|---|
-| GET | `/api/courses?q=<text>` | Search courses by code or title (empty `q` returns all) | 200 |
+| GET | `/api/courses?q=<text>` | Search courses by code or title (empty `q` returns all; spaces ignored in codes, so `coe628` works). `q`: max 20 chars, letters/digits/spaces only | 200, 400 |
 | GET | `/api/courses/<id>` | One course | 200, 404 |
 | GET | `/api/enrollments` | Courses you're enrolled in | 200 |
 | POST | `/api/enrollments` | Enroll. Body: `{"course_id": 1}` | 201, 400, 404, 409 (already enrolled) |
