@@ -5,11 +5,15 @@ Run locally with ``flask --app app run``; serve with ``gunicorn "app:create_app(
 
 import json
 import os
+import re
 
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.exceptions import HTTPException
 
 import db
+
+MAX_QUERY_LENGTH = 20
+QUERY_PATTERN = re.compile(r"[A-Za-z0-9 ]*")  # ASCII letters, digits and spaces
 
 
 def not_implemented():
@@ -47,20 +51,27 @@ def create_app(test_config=None):
         """Search courses by code or title.
 
         GET /api/courses?q= -> 200 [{id, code, title, description, credits, enrolled}]
+                             | 400 q over 20 chars or not letters/digits/spaces
+
+        Code matching ignores spaces, so "coe628" finds "COE 628".
         """
         q = request.args.get("q", "").strip()
-        # Escape LIKE wildcards so "%" or "_" in the query match literally.
-        pattern = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        if len(q) > MAX_QUERY_LENGTH:
+            return jsonify({"error": f"Search must be at most {MAX_QUERY_LENGTH} characters."}), 400
+        if not QUERY_PATTERN.fullmatch(q):
+            return jsonify({"error": "Search can only contain letters, numbers and spaces."}), 400
+        q = " ".join(q.split())  # collapse repeated spaces
+        # The validation above rules out LIKE wildcards (% and _), so no escaping is needed.
         rows = db.get_db().execute(
             """
             SELECT c.id, c.code, c.title, c.description, c.credits,
                    e.id IS NOT NULL AS enrolled
             FROM courses c
             LEFT JOIN enrollments e ON e.course_id = c.id
-            WHERE c.code LIKE :p ESCAPE '\\' OR c.title LIKE :p ESCAPE '\\'
+            WHERE REPLACE(c.code, ' ', '') LIKE :code_p OR c.title LIKE :title_p
             ORDER BY c.code
             """,
-            {"p": pattern},
+            {"code_p": f"%{q.replace(' ', '')}%", "title_p": f"%{q}%"},
         ).fetchall()
         return jsonify([{**row, "enrolled": bool(row["enrolled"])} for row in rows])
 

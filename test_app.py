@@ -61,18 +61,47 @@ def test_query_is_trimmed_and_case_insensitive(client):
     assert codes(search(client, "  OPERATING  ")) == ["COE 628"]
 
 
-@pytest.mark.parametrize("q", ["zzz", "日本語", "🙂"])
-def test_no_match_returns_empty_list(client, q):
-    assert search(client, q) == []
+@pytest.mark.parametrize("q", ["coe628", "COE628", "coe 628", "coe  628"])
+def test_code_match_ignores_spaces(client, q):
+    assert codes(search(client, q)) == ["COE 628"]
 
 
-@pytest.mark.parametrize("q", ["%", "_", "\\"])
-def test_like_wildcards_match_literally(client, q):
-    assert search(client, q) == []
+def test_repeated_spaces_in_title_are_collapsed(client):
+    assert codes(search(client, "operating   systems")) == ["COE 628"]
 
 
-def test_sql_injection_is_treated_as_text(client):
-    assert search(client, "' OR 1=1 --") == []
+def test_no_match_returns_empty_list(client):
+    assert search(client, "zzz") == []
+
+
+def test_query_of_exactly_20_chars_is_allowed(client):
+    assert search(client, "a" * 20) == []
+
+
+def test_length_is_checked_after_trimming(client):
+    assert search(client, "  " + "a" * 20 + "  ") == []
+
+
+def bad_search(client, q):
+    resp = client.get("/api/courses", query_string={"q": q})
+    assert resp.status_code == 400
+    return resp.get_json()["error"]
+
+
+def test_query_over_20_chars_is_rejected(client):
+    assert "20 characters" in bad_search(client, "a" * 21)
+
+
+@pytest.mark.parametrize("q", [
+    "%", "_", "\\",           # LIKE wildcards / escape char
+    "' OR 1=1 --",            # SQL injection
+    "<script>",               # markup
+    "COE-628", "c++",         # punctuation
+    "日本語", "🙂", "é",       # non-ASCII
+    "coe\t628", "coe\n628",   # whitespace other than spaces
+])
+def test_query_with_disallowed_characters_is_rejected(client, q):
+    assert "letters, numbers and spaces" in bad_search(client, q)
 
 
 def test_course_has_expected_shape(client):
