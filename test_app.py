@@ -123,3 +123,39 @@ def test_enrolled_flag_reflects_enrollments(app, client):
     enrolled = {c["code"]: c["enrolled"] for c in search(client)}
     assert enrolled["COE 628"] is True
     assert sum(enrolled.values()) == 1
+
+
+# ---------- GET /api/courses/<id> ----------
+
+def test_get_course_by_id(client):
+    resp = client.get("/api/courses/4")
+    assert resp.status_code == 200
+    assert resp.get_json() == {
+        "id": 4,
+        "code": "COE 628",
+        "title": "Operating Systems",
+        "description": "Processes, threads, scheduling, synchronization, memory and file systems.",
+        "credits": 1.0,
+        "enrolled": False,
+    }
+
+
+def test_get_course_shows_enrolled(app, client):
+    with app.app_context():
+        get_db().execute("INSERT INTO enrollments (course_id) VALUES (4)")
+        get_db().commit()
+    assert client.get("/api/courses/4").get_json()["enrolled"] is True
+
+
+@pytest.mark.parametrize("path", [
+    "/api/courses/0",
+    "/api/courses/9999",
+    "/api/courses/99999999999999999999",  # beyond SQLite's 64-bit INTEGER
+    "/api/courses/-1",                    # <int:> rejects negatives
+    "/api/courses/abc",                   # <int:> rejects non-numbers
+    "/api/courses/1.5",
+])
+def test_get_unknown_or_invalid_course_is_404_json(client, path):
+    resp = client.get(path)
+    assert resp.status_code == 404
+    assert "error" in resp.get_json()
