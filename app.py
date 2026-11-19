@@ -39,10 +39,6 @@ def enrollment_json(row):
 QUERY_PATTERN = re.compile(r"[A-Za-z0-9 ]*")  # ASCII letters, digits and spaces
 
 
-def not_implemented():
-    return jsonify({"error": "not implemented"}), 501
-
-
 def create_app(test_config=None):
     app = Flask(__name__)
     app.config.from_mapping(
