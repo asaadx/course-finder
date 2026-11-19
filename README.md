@@ -3,9 +3,8 @@
 A small web app where learners search for courses and enroll in them.
 Built with Flask, SQLite and plain HTML/CSS/JavaScript.
 
-> **Current status:** the app runs and the UI loads, but the API still returns `501 Not Implemented`.
-> The database layer (`schema.sql`, `db.py`, `seed.py`) is the next PR. Until it lands, step 3 below does nothing
-> and the page shows its error states.
+> **Current status:** search works (`GET /api/courses`). The enrollment endpoints still return `501 Not Implemented`,
+> so the sidebar shows an error and the **Enroll** button fails until they're built.
 
 ---
 
