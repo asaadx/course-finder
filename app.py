@@ -6,6 +6,7 @@ Run locally with ``flask --app app run``; serve with ``gunicorn "app:create_app(
 import json
 import os
 import re
+import sqlite3
 
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.exceptions import HTTPException
@@ -13,6 +14,28 @@ from werkzeug.exceptions import HTTPException
 import db
 
 MAX_QUERY_LENGTH = 20
+MAX_BODY_BYTES = 1024  # request bodies are tiny ({"course_id": 1}); reject anything bigger
+
+ENROLLMENT_SELECT = """
+    SELECT e.id, e.enrolled_at,
+           c.id AS course_id, c.code, c.title, c.description, c.credits
+    FROM enrollments e
+    JOIN courses c ON c.id = e.course_id
+"""
+
+
+def enrollment_json(row):
+    return {
+        "id": row["id"],
+        "enrolled_at": row["enrolled_at"],
+        "course": {
+            "id": row["course_id"],
+            "code": row["code"],
+            "title": row["title"],
+            "description": row["description"],
+            "credits": row["credits"],
+        },
+    }
 QUERY_PATTERN = re.compile(r"[A-Za-z0-9 ]*")  # ASCII letters, digits and spaces
 
 
@@ -26,6 +49,7 @@ def create_app(test_config=None):
         DATABASE=os.environ.get(
             "DATABASE", os.path.join(app.root_path, "data", "courses.db")
         ),
+        MAX_CONTENT_LENGTH=MAX_BODY_BYTES,
     )
     if test_config is not None:
         app.config.update(test_config)
@@ -34,6 +58,7 @@ def create_app(test_config=None):
 
     @app.errorhandler(404)
     @app.errorhandler(405)
+    @app.errorhandler(413)
     def handle_http_error(err: HTTPException):
         # Reuse Werkzeug's response so headers like Allow (on 405) are kept.
         response = err.get_response()
@@ -96,16 +121,35 @@ def create_app(test_config=None):
 
     @app.get("/api/enrollments")
     def list_enrollments():
-        """GET /api/enrollments -> 200 [{id, course: {...}, enrolled_at}]."""
-        return not_implemented()
+        """GET /api/enrollments -> 200 [{id, course: {...}, enrolled_at}], oldest first."""
+        rows = db.get_db().execute(ENROLLMENT_SELECT + " ORDER BY e.id").fetchall()
+        return jsonify([enrollment_json(row) for row in rows])
 
     @app.post("/api/enrollments")
     def create_enrollment():
         """Enroll in a course. Body: {"course_id": int}.
 
         POST /api/enrollments -> 201 enrollment | 400 bad/missing course_id
-        | 404 unknown course | 409 already enrolled
+        | 404 unknown course | 409 already enrolled | 413 body over 1 KB
         """
-        return not_implemented()
+        body = request.get_json(silent=True)  # None if not JSON / wrong Content-Type
+        if not isinstance(body, dict):
+            return jsonify({"error": "Request body must be a JSON object."}), 400
+        course_id = body.get("course_id")
+        # type() rather than isinstance(): bool is a subclass of int, and True must be rejected.
+        if type(course_id) is not int or not 1 <= course_id <= db.SQLITE_MAX_INT:
+            return jsonify({"error": "course_id must be a positive integer."}), 400
+
+        conn = db.get_db()
+        if conn.execute("SELECT 1 FROM courses WHERE id = ?", (course_id,)).fetchone() is None:
+            return jsonify({"error": "Course not found."}), 404
+        try:
+            cur = conn.execute("INSERT INTO enrollments (course_id) VALUES (?)", (course_id,))
+            conn.commit()
+        except sqlite3.IntegrityError:  # UNIQUE(course_id)
+            return jsonify({"error": "You are already enrolled in this course."}), 409
+
+        row = conn.execute(ENROLLMENT_SELECT + " WHERE e.id = ?", (cur.lastrowid,)).fetchone()
+        return jsonify(enrollment_json(row)), 201
 
     return app
