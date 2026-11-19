@@ -48,8 +48,21 @@ def create_app(test_config=None):
 
         GET /api/courses?q= -> 200 [{id, code, title, description, credits, enrolled}]
         """
-        q = request.args.get("q", "")  # noqa: F841 (used once search is implemented)
-        return not_implemented()
+        q = request.args.get("q", "").strip()
+        # Escape LIKE wildcards so "%" or "_" in the query match literally.
+        pattern = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        rows = db.get_db().execute(
+            """
+            SELECT c.id, c.code, c.title, c.description, c.credits,
+                   e.id IS NOT NULL AS enrolled
+            FROM courses c
+            LEFT JOIN enrollments e ON e.course_id = c.id
+            WHERE c.code LIKE :p ESCAPE '\\' OR c.title LIKE :p ESCAPE '\\'
+            ORDER BY c.code
+            """,
+            {"p": pattern},
+        ).fetchall()
+        return jsonify([{**row, "enrolled": bool(row["enrolled"])} for row in rows])
 
     @app.get("/api/courses/<int:course_id>")
     def get_course(course_id):
