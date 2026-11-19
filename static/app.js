@@ -152,7 +152,9 @@
       .catch(function (err) {
         if (err.name === "AbortError" || controller !== searchController) return;
         els.results.replaceChildren();
-        setStatus(els.resultsStatus, "Could not load courses. Check your connection and try again.", true);
+        // 400 = the query failed server-side validation; show the server's reason.
+        var message = err.status === 400 ? err.message : "Could not load courses. Check your connection and try again.";
+        setStatus(els.resultsStatus, message, true);
       });
   }
 
