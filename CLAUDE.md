@@ -21,6 +21,18 @@ Course Finder: a small Flask + SQLite + vanilla JS tool that lets learners searc
    - **How to test**
    - **Reviewer checklist**: a few `- [ ]` items the reviewer should verify
 
+## Commands
+
+Run from the repo root. The full user-facing guide is in `README.md`.
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt  # install
+python seed.py                     # create/reset data/courses.db (wipes enrollments)
+flask --app app run --debug        # dev server on :5000 (use --port 5001 if taken)
+pytest                             # all tests (collocated test_*.py)
+gunicorn -b 0.0.0.0:8000 "app:create_app()"  # production-style server
+```
+
 ## Conventions
 
 - Tests are collocated: `test_<module>.py` sits next to `<module>.py`. Run them with `pytest`.
