@@ -3,7 +3,7 @@
 A small web app where learners search for courses and enroll in them.
 Built with Flask, SQLite and plain HTML/CSS/JavaScript.
 
-> **Current status:** search, course lookup and enrolling all work. Not built yet: unenrolling, and the Docker image.
+> **Current status:** search, course lookup, enrolling and the Docker image all work. Not built: unenrolling.
 
 ---
 
@@ -90,16 +90,29 @@ curl -X POST http://127.0.0.1:5000/api/enrollments \
 curl http://127.0.0.1:5000/api/enrollments
 ```
 
-## 8. Run with Docker (coming soon)
+## 8. Run with Docker
 
-The `Dockerfile` hasn't been written yet. Once it is, the commands will be:
+The image is based on Ubuntu 24.04 and runs the app with gunicorn on port 8000, as a non-root user.
+You only need Docker; Python is installed inside the image. On an Ubuntu server, install Docker with
+`sudo apt install -y docker.io`. On a Mac, use Docker Desktop.
 
 ```bash
 docker build -t course-finder .
-docker run -p 8000:8000 -v course-finder-data:/app/data course-finder
+docker run -d --name course-finder -p 8000:8000 -v course-finder-data:/app/data course-finder
 ```
 
-Then open **http://localhost:8000**. The `-v` volume keeps your enrollments when the container restarts.
+Open **http://localhost:8000**.
+
+- **First start:** the container seeds the database automatically.
+- **Restarts keep enrollments:** the database lives in the `course-finder-data` volume.
+- **Useful commands:**
+  ```bash
+  docker logs -f course-finder        # view server logs
+  docker ps                           # STATUS shows (healthy) once the app responds
+  docker exec course-finder python3 seed.py   # reset the DB (wipes enrollments)
+  docker rm -f course-finder          # stop and remove the container (the volume stays)
+  docker volume rm course-finder-data # delete the data too
+  ```
 
 ## Troubleshooting
 
