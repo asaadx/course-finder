@@ -9,6 +9,8 @@ import os
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.exceptions import HTTPException
 
+import db
+
 
 def not_implemented():
     return jsonify({"error": "not implemented"}), 501
@@ -24,7 +26,7 @@ def create_app(test_config=None):
     if test_config is not None:
         app.config.update(test_config)
 
-    # TODO: db.init_app(app) once db.py is implemented.
+    db.init_app(app)
 
     @app.errorhandler(404)
     @app.errorhandler(405)
