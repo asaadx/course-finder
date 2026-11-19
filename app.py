@@ -77,8 +77,22 @@ def create_app(test_config=None):
 
     @app.get("/api/courses/<int:course_id>")
     def get_course(course_id):
-        """GET /api/courses/<id> -> 200 course | 404 unknown course."""
-        return not_implemented()
+        """GET /api/courses/<id> -> 200 {id, code, title, description, credits, enrolled} | 404 unknown course."""
+        row = None
+        if course_id <= db.SQLITE_MAX_INT:
+            row = db.get_db().execute(
+                """
+                SELECT c.id, c.code, c.title, c.description, c.credits,
+                       e.id IS NOT NULL AS enrolled
+                FROM courses c
+                LEFT JOIN enrollments e ON e.course_id = c.id
+                WHERE c.id = ?
+                """,
+                (course_id,),
+            ).fetchone()
+        if row is None:
+            return jsonify({"error": "Course not found."}), 404
+        return jsonify({**row, "enrolled": bool(row["enrolled"])})
 
     @app.get("/api/enrollments")
     def list_enrollments():

@@ -5,6 +5,8 @@ import sqlite3
 
 from flask import current_app, g
 
+SQLITE_MAX_INT = 2**63 - 1  # larger Python ints overflow when bound as SQLite INTEGER
+
 
 def get_db():
     """Return this request's connection, opening it on first use."""
