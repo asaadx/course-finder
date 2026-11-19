@@ -1,6 +1,6 @@
 # Codebase map
 
-> Status: the DB layer, the frontend and all API routes are implemented. The Dockerfile is still empty.
+> Status: everything is implemented: DB layer, frontend, all API routes and the Docker image.
 > Update this page as files get implemented.
 
 ## Overview
@@ -26,7 +26,8 @@ static/app.js  --fetch-->  app.py (routes)  -->  db.py  -->  SQLite file (schema
 | `test_app.py` | Collocated pytest tests for the API routes (Flask test client, temp DB). |
 | `test_db.py` | Collocated pytest tests for the schema constraints (UNIQUE, FK) and seeding. |
 | `requirements.txt` | Python dependencies, pinned with `==`: `flask`, `gunicorn`, `pytest`. |
-| `Dockerfile` / `.dockerignore` | Container image (`python:3.12-slim` + gunicorn on port 8000). The SQLite file goes in a mounted volume. |
+| `Dockerfile` / `.dockerignore` | Ubuntu 24.04 image: Python 3.12 venv, gunicorn on port 8000, non-root `app` user, healthcheck. The SQLite file lives in the `/app/data` volume. |
+| `docker-entrypoint.sh` | Container start script: seeds the DB if the file doesn't exist yet, then starts gunicorn. |
 | `README.md` | Setup, how to run locally and in Docker, endpoint reference, curl examples. |
 | `CLAUDE.md` | Workflow rules for agents (branches, worktrees, commits, PRs). |
 | `wiki/` | This wiki. Start at [index.md](index.md). |

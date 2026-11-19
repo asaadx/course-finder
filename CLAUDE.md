@@ -31,6 +31,7 @@ python seed.py                     # create/reset data/courses.db (wipes enrollm
 flask --app app run --debug        # dev server on :5000 (use --port 5001 if taken)
 pytest                             # all tests (collocated test_*.py)
 gunicorn -b 0.0.0.0:8000 "app:create_app()"  # production-style server
+docker build -t course-finder . && docker run -p 8000:8000 -v course-finder-data:/app/data course-finder
 ```
 
 ## Conventions
