@@ -162,10 +162,73 @@
     debounceTimer = setTimeout(function () { search(query); }, DEBOUNCE_MS);
   }
 
+  // ---------- enroll ----------
+
+  function showInlineError(action, message) {
+    var existing = action.querySelector(".inline-error");
+    if (existing) existing.remove();
+    var msg = el("p", "inline-error", message);
+    msg.setAttribute("role", "alert");
+    action.append(msg);
+  }
+
+  function markEnrolledInResults(courseId) {
+    var item = els.results.querySelector('li[data-course-id="' + String(Number(courseId)) + '"]');
+    if (item) renderEnrolledBadge(item.querySelector(".result-action"));
+  }
+
+  function enroll(courseId, btn) {
+    var action = btn.parentElement;
+    btn.disabled = true;
+    btn.textContent = "Enrolling...";
+    var oldError = action.querySelector(".inline-error");
+    if (oldError) oldError.remove();
+
+    return fetchJSON("/api/enrollments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ course_id: courseId }),
+    })
+      .then(function (enrollment) {
+        if (enrollment && enrollment.course) {
+          if (!enrolledIds.has(courseId)) addEnrolledCourse(enrollment.course);
+        } else {
+          loadEnrollments(); // unexpected body: resync the sidebar from the server
+        }
+        enrolledIds.add(courseId);
+        markEnrolledInResults(courseId);
+      })
+      .catch(function (err) {
+        if (err.status === 409) {
+          // Already enrolled on the server: reflect that, and resync the sidebar.
+          enrolledIds.add(courseId);
+          markEnrolledInResults(courseId);
+          var item = els.results.querySelector('li[data-course-id="' + courseId + '"] .result-action');
+          if (item) showInlineError(item, err.message);
+          loadEnrollments();
+          return;
+        }
+        btn.disabled = false;
+        btn.textContent = "Enroll";
+        var message = err.status ? err.message : "Network error. Please try again.";
+        showInlineError(action, message);
+      });
+  }
+
+  function onResultsClick(e) {
+    var btn = e.target.closest("button.btn");
+    if (!btn || btn.disabled || !els.results.contains(btn)) return;
+    var item = btn.closest("li.result");
+    var courseId = Number(item && item.dataset.courseId);
+    if (!Number.isInteger(courseId)) return;
+    enroll(courseId, btn);
+  }
+
   // ---------- init ----------
 
   function init() {
     els.input.addEventListener("input", onSearchInput);
+    els.results.addEventListener("click", onResultsClick);
     els.form.addEventListener("submit", function (e) {
       e.preventDefault();
       clearTimeout(debounceTimer);
