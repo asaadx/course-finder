@@ -24,3 +24,4 @@ Course Finder: a small Flask + SQLite + vanilla JS tool that lets learners searc
 ## Conventions
 
 - Tests are collocated: `test_<module>.py` sits next to `<module>.py`. Run them with `pytest`.
+- Navigation: start with [`wiki/index.md`](wiki/index.md). Keep the wiki up to date when files change.
