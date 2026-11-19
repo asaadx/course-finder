@@ -14,6 +14,7 @@ from werkzeug.exceptions import HTTPException
 import db
 
 MAX_QUERY_LENGTH = 20
+QUERY_PATTERN = re.compile(r"[A-Za-z0-9 ]*")  # ASCII letters, digits and spaces
 MAX_BODY_BYTES = 1024  # request bodies are tiny ({"course_id": 1}); reject anything bigger
 
 ENROLLMENT_SELECT = """
@@ -36,7 +37,6 @@ def enrollment_json(row):
             "credits": row["credits"],
         },
     }
-QUERY_PATTERN = re.compile(r"[A-Za-z0-9 ]*")  # ASCII letters, digits and spaces
 
 
 def create_app(test_config=None):
